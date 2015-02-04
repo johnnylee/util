@@ -17,13 +17,22 @@ func withLogging(handler http.Handler) http.Handler {
 // ListenAndServeWithLogging: A wrapper for the standard library's
 // http.ListenAndServe function, logging requests using the standard logger.
 // Uses http.DefaultServeMux.
-func ListenAndServeWithLogging(addr string) {
-	http.ListenAndServe(addr, withLogging(http.DefaultServeMux))
+func ListenAndServeWithLogging(addr string, handler http.Handler) error {
+	if handler == nil {
+		handler = http.DefaultServeMux
+	}
+	return http.ListenAndServe(addr, withLogging(handler))
 }
 
-// ListenAndServeWithLoggingTLS: Like ListenAndServeWithLogging, but with
+// ListenAndServeTLSWithLogging: Like ListenAndServeWithLogging, but with
 // encryption.
-func ListenAndServeWithLoggingTLS(addr, crtPath, keyPath string) {
+func ListenAndServeTLSWithLogging(
+	addr string, handler http.Handler, crtPath, keyPath string) error {
+
+	if handler == nil {
+		handler = http.DefaultServeMux
+	}
+
 	var err error
 
 	if crtPath, err = ExpandPath(crtPath); err != nil {
@@ -34,21 +43,18 @@ func ListenAndServeWithLoggingTLS(addr, crtPath, keyPath string) {
 		panic(err)
 	}
 
-	http.ListenAndServeTLS(
-		addr, crtPath, keyPath, withLogging(http.DefaultServeMux))
+	return http.ListenAndServeTLS(addr, crtPath, keyPath, withLogging(handler))
 }
 
-// HttpToHttps: Accept connections on port 80 and forward to the same address
+// HttpToHttps: Accept connections on port 80 and forward to the same host
 // using https. This will run in an infinite loop, or panic if it can't listen.
 func HttpToHttps() {
-	err := http.ListenAndServe(":80", http.HandlerFunc(httpToHttpsHandler))
+	err := http.ListenAndServe(":80", http.HandlerFunc(
+		func(w http.ResponseWriter, r *http.Request) {
+			target := "https://" + r.Host + r.URL.RequestURI()
+			http.Redirect(w, r, target, http.StatusMovedPermanently)
+		}))
 	if err != nil {
 		panic(err)
 	}
-}
-
-func httpToHttpsHandler(w http.ResponseWriter, r *http.Request) {
-	url := r.URL
-	url.Scheme = "https"
-	http.Redirect(w, r, url.String(), http.StatusMovedPermanently)
 }
