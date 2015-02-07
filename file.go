@@ -15,7 +15,9 @@ func FileExists(elem ...string) bool {
 }
 
 // ExpandPath: Expand the path to its full path.
-func ExpandPath(path string) (string, error) {
+func ExpandPath(elem ...string) (string, error) {
+	path := filepath.Join(elem...)
+
 	var err error
 
 	if len(path) == 0 {
@@ -25,13 +27,13 @@ func ExpandPath(path string) (string, error) {
 	if path[0] == '~' {
 		usr, err := user.Current()
 		if err != nil {
-			return "", err
+			return path, err
 		}
 		path = filepath.Join(usr.HomeDir, path[1:])
 	}
 
 	if path, err = filepath.Abs(path); err != nil {
-		return "", err
+		return path, err
 	}
 
 	return path, nil
